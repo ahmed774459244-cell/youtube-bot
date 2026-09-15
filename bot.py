@@ -566,7 +566,16 @@ async def _generate_and_send(message: Message, status_msg: Message, topic: str, 
 
     except Exception as e:
         logger.exception("Video yaratishda xatolik")
-        await status_msg.edit_text(t(ui_lang, "error_msg", error=str(e)))
+        error_text = t(ui_lang, "error_msg", error=str(e))
+        try:
+            await status_msg.edit_text(error_text)
+        except Exception:
+            # status_msg tahrirlab bo'lmasa (masalan juda eski yoki o'zgarmagan bo'lsa),
+            # yangi xabar sifatida yuboramiz — foydalanuvchi baribir xabardor bo'lishi kerak.
+            try:
+                await message.answer(error_text)
+            except Exception:
+                logger.warning("Foydalanuvchiga xatolik haqida xabar yuborib bo'lmadi.")
         return False
 
 
