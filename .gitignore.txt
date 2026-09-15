@@ -1,0 +1,9 @@
+.env
+__pycache__/
+*.pyc
+bot_database.db
+bot_database.db-*
+bot_log.txt
+temp_files/
+output_videos/
+   telegram-bot-api/
