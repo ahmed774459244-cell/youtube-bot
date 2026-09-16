@@ -33,7 +33,8 @@ def build_scene_clip(media: dict, audio_path: str, output_path: str, scene_index
             "-t", str(duration),
             "-vf", scale_filter,
             "-r", str(VIDEO_FPS),
-            "-c:v", "libx264", "-c:a", "aac",
+            "-c:v", "libx264", "-preset", "veryfast", "-threads", "1",
+            "-c:a", "aac",
             "-map", "0:v:0", "-map", "1:a:0",
             "-shortest",
             output_path,
@@ -48,7 +49,7 @@ def build_scene_clip(media: dict, audio_path: str, output_path: str, scene_index
             zoom_expr = "if(eq(on,1),1.5,max(zoom-0.0015,1.0))"
 
         ken_burns_filter = (
-            f"scale=3840:2160,"
+            f"scale=2560:1440,"
             f"zoompan=z='{zoom_expr}':d={total_frames}:"
             f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':s={VIDEO_WIDTH}x{VIDEO_HEIGHT}:fps={VIDEO_FPS},"
             f"setsar=1"
@@ -60,7 +61,8 @@ def build_scene_clip(media: dict, audio_path: str, output_path: str, scene_index
             "-t", str(duration),
             "-vf", ken_burns_filter,
             "-r", str(VIDEO_FPS),
-            "-c:v", "libx264", "-c:a", "aac",
+            "-c:v", "libx264", "-preset", "veryfast", "-threads", "1",
+            "-c:a", "aac",
             "-pix_fmt", "yuv420p",
             "-shortest",
             output_path,
@@ -111,7 +113,8 @@ def compress_if_needed(input_path: str, max_size_mb: int = 45) -> str:
         "-maxrate", f"{int(video_kbps * 1.2)}k",
         "-bufsize", f"{video_kbps * 2}k",
         "-b:a", f"{audio_kbps}k",
-        "-c:v", "libx264", "-c:a", "aac",
+        "-c:v", "libx264", "-preset", "veryfast", "-threads", "1",
+        "-c:a", "aac",
         compressed_path,
     ]
     subprocess.run(cmd, check=True, capture_output=True)

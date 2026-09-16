@@ -20,8 +20,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
 
 # --- Video sozlamalari ---
-VIDEO_WIDTH = 1920
-VIDEO_HEIGHT = 1080
+VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "1280"))
+VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "720"))
 VIDEO_FPS = 30
 
 # Ovoz tili (edge-tts formatida). Bir nechta til orasidan tanlash mumkin:
