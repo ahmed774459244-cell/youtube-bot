@@ -21,7 +21,7 @@ RETRY_DELAY_SECONDS = 3
 REQUEST_TIMEOUT = 60  # sekundda - sekin internet uchun oshirilgan
 
 AI_IMAGE_TIMEOUT_SECONDS = 45  # bitta AI rasm so'rovi uchun maksimal kutish vaqti
-AI_IMAGE_MAX_RETRIES = 2
+AI_IMAGE_MAX_RETRIES = 1  # billing yoqilmagan bo'lsa doim 429 beradi, tez Pexels'ga o'tamiz
 
 
 def _generate_ai_image_once(prompt: str, output_path: str) -> bool:

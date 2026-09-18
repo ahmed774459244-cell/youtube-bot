@@ -327,3 +327,52 @@ Bepul emas — har bir rasm taxminan **$0.04-0.07** turadi (Gemini narxiga qarab
 
 ### Zaxira reja (avtomatik)
 Agar AI rasm generatsiyasi biror sababdan (limit, xatolik) ishlamasa, bot **avtomatik ravishda Pexels'ga qaytadi** — hech qachon video yaratish to'xtab qolmaydi.
+
+## Qo'shimcha: Render.com'ga joylashtirish (pullik reja, Docker orqali)
+
+Sizda Render'da pullik obuna bo'lsa, bu — eng oson yo'l: hech qanday SSH, systemd yoki qo'lda server sozlash shart emas.
+
+### 1. Kodni GitHub'ga yuklang
+
+Render GitHub repozitoriyidan avtomatik deploy qiladi. Agar hali GitHub'da repo yaratmagan bo'lsangiz:
+1. github.com'da yangi (**private**) repozitoriy yarating
+2. Ushbu papkadagi barcha fayllarni o'sha repozitoriyga yuklang (GitHub Desktop yoki `git` orqali)
+
+**Diqqat:** `.env` faylini **hech qachon** GitHub'ga yuklamang (`.gitignore` fayliga `.env` qo'shib qo'ying) — u yerda maxfiy kalitlaringiz bor.
+
+### 2. Render'da yangi xizmat yarating
+
+1. Render Dashboard'da **"New +"** → **"Background Worker"** ni tanlang
+2. GitHub repozitoriyingizni ulang
+3. **"Environment"**: **"Docker"** ni tanlang (loyihada tayyor `Dockerfile` bor, Render uni avtomatik topadi)
+4. Reja — sizning $7/oy obunangizga mos keladigan tarifni tanlang
+
+### 3. Muhit o'zgaruvchilarini (Environment Variables) kiriting
+
+Render sozlamalarida **"Environment"** bo'limiga o'ting, `.env` faylingizdagi barcha qatorlarni birma-bir qo'shing:
+```
+TELEGRAM_BOT_TOKEN=...
+GEMINI_API_KEY=...
+PEXELS_API_KEY=...
+FREE_MINUTES=50
+ADMIN_TELEGRAM_ID=...
+PAYMENT_INSTRUCTIONS=...
+PAYMENT_CARD_NUMBER=...
+RATE_PER_MINUTE=500
+MAX_CONCURRENT_JOBS=2
+```
+(va boshqa kerakli kalitlar)
+
+### 4. Ma'lumotlar bazasi uchun doimiy disk qo'shing (MUHIM!)
+
+Render'ning standart fayl tizimi **vaqtinchalik** — har safar qayta ishga tushganda (masalan yangilanishdan keyin) foydalanuvchilar balansi (`bot_database.db`) **o'chib ketishi mumkin**. Buning oldini olish uchun:
+1. Xizmat sozlamalarida **"Disks"** bo'limiga o'ting
+2. Yangi disk qo'shing: hajmi 1GB yetarli (arzon, oyiga taxminan $0.25)
+3. **Mount path**: `/app/data`
+4. `.env`da yangi qator qo'shing: `DB_PATH=/app/data/bot_database.db` (yoki shu faylni shu yo'lga ko'rsatadigan qilib `config.py`ni moslashtirish kerak bo'ladi — so'rasangiz shuni ham sozlab beraman)
+
+### 5. Deploy qiling
+
+**"Create Background Worker"** tugmasini bosing — Render avtomatik ravishda `Dockerfile` orqali botni quradi va ishga tushiradi. Loglarni Render Dashboard'ning **"Logs"** bo'limida real vaqtda kuzatishingiz mumkin.
+
+Shu bilan bot **24/7, kompyuteringizdan mustaqil** ishlaydi — Render serveri hech qachon o'chmaydi (pullik reja tufayli, bepul rejadagi "uxlab qolish" muammosi yo'q).

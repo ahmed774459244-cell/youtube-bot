@@ -24,6 +24,19 @@ VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "1280"))
 VIDEO_HEIGHT = int(os.getenv("VIDEO_HEIGHT", "720"))
 VIDEO_FPS = 30
 
+# ffmpeg necha protsessor yadrosidan foydalansin. Server RAM/CPU'siga qarab sozlang:
+# kichik server (0.5-1 CPU) -> 1, o'rtacha/katta server (2+ CPU) -> 2 yoki undan ko'p.
+VIDEO_THREADS = os.getenv("VIDEO_THREADS", "2")
+
+# --- Subtitr sozlamalari ---
+SUBTITLES_ENABLED = os.getenv("SUBTITLES_ENABLED", "true").lower() == "true"
+SUBTITLE_FONT_SIZE = int(os.getenv("SUBTITLE_FONT_SIZE", "22"))
+SUBTITLE_FONT_NAME = os.getenv("SUBTITLE_FONT_NAME", "DejaVu Sans")
+# ASS rang formati: &HAABBGGRR (AA=shaffoflik, BGR — teskari tartibda)
+SUBTITLE_PRIMARY_COLOR = os.getenv("SUBTITLE_PRIMARY_COLOR", "&H00FFFFFF")   # oq matn
+SUBTITLE_OUTLINE_COLOR = os.getenv("SUBTITLE_OUTLINE_COLOR", "&H00000000")  # qora kontur
+SUBTITLE_HIGHLIGHT_COLOR = os.getenv("SUBTITLE_HIGHLIGHT_COLOR", "&H0000D7FF")  # oltin-sariq (urg'u so'zlar uchun, kelajakda)
+
 # Ovoz tili (edge-tts formatida). Bir nechta til orasidan tanlash mumkin:
 # O'zbek:   "uz-UZ-SardorNeural" (erkak) yoki "uz-UZ-MadinaNeural" (ayol)
 # Ingliz:   "en-US-AriaNeural" (ayol) yoki "en-US-GuyNeural" (erkak)

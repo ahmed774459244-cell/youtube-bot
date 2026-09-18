@@ -59,7 +59,7 @@ def create_video(topic: str, target_minutes: int = 10, progress_callback=None,
             # 4. Sahna klipini yig'ish
             report(f"🎬 Sahna {i}/{total}: klip yig'ilmoqda...")
             clip_path = os.path.join(job_temp_dir, f"clip_{i}.mp4")
-            build_scene_clip(media, audio_path, clip_path, scene_index=i)
+            build_scene_clip(media, audio_path, clip_path, scene_index=i, subtitle_text=scene["text"])
             clip_paths.append(clip_path)
 
         # 5. Barcha kliplarni birlashtirish

@@ -11,8 +11,8 @@ from config import TTS_VOICE
 
 logger = logging.getLogger(__name__)
 
-MAX_RETRIES = 2
-RETRY_DELAY_SECONDS = 3
+MAX_RETRIES = 1  # VPS serverlarda edge-tts odatda bloklangan (403), tez gTTS'ga o'tamiz
+RETRY_DELAY_SECONDS = 1
 
 # edge-tts ovoz kodidan gTTS til kodiga taxminiy moslashtirish (zaxira reja uchun).
 # DIQQAT: gTTS'da o'zbek tili yo'q, shuning uchun agar edge-tts o'zbekcha ovoz bilan

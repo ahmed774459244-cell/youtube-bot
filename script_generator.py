@@ -80,6 +80,63 @@ Respond ONLY in the following JSON format, no other text:
     return scenes
 
 
+def generate_youtube_metadata(topic: str, script_language: str = None) -> dict:
+    """
+    Video uchun YouTube'ga yuklashga tayyor sarlavha (3 variant), tavsif va hashtag'lar yaratadi.
+    Qaytaradi: {"titles": [...], "description": "...", "hashtags": [...]}
+    """
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    lang = script_language or SCRIPT_LANGUAGE
+
+    prompt = f"""You are a YouTube SEO expert.
+Topic: "{topic}"
+
+Generate YouTube metadata for a video on this topic, in {lang}:
+1. "titles" — 3 different catchy, click-worthy title options (each under 70 characters)
+2. "description" — a 2-3 paragraph YouTube description, engaging, with a hook in the first line (SEO-friendly)
+3. "hashtags" — 8-10 relevant hashtags (without # symbol, just the words)
+
+Respond ONLY in this JSON format, no other text:
+{{"titles": ["...", "...", "..."], "description": "...", "hashtags": ["...", "..."]}}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=prompt,
+    )
+    raw = _extract_json(response.text)
+    return json.loads(raw)
+
+
+def generate_channel_branding(niche: str, script_language: str = None) -> dict:
+    """
+    Kanal mavzusi (niche) asosida kanal nomi variantlari va tavsifini yaratadi.
+    Qaytaradi: {"names": [...], "description": "...", "logo_prompt": "...", "banner_prompt": "..."}
+    """
+    client = genai.Client(api_key=GEMINI_API_KEY)
+    lang = script_language or SCRIPT_LANGUAGE
+
+    prompt = f"""You are a YouTube branding expert.
+Channel niche/topic: "{niche}"
+
+Generate original branding for a NEW YouTube channel in this niche, in {lang}:
+1. "names" — 5 catchy, memorable, original channel name ideas (short, brandable, not copying any existing real channel or brand)
+2. "description" — a 2-3 paragraph "About" section for the channel (engaging, explains what viewers will get)
+3. "logo_prompt" — a detailed ENGLISH prompt (15-25 words) for an AI image generator to create an original, simple, iconic, square logo/icon representing this channel (describe style, symbol, colors — no text/letters in the image)
+4. "banner_prompt" — a detailed ENGLISH prompt (15-25 words) for an AI image generator to create an original, wide, visually striking YouTube channel banner/header image representing this niche (describe style, mood, colors, composition — no text in the image)
+
+Respond ONLY in this JSON format, no other text:
+{{"names": ["...", "...", "...", "...", "..."], "description": "...", "logo_prompt": "...", "banner_prompt": "..."}}
+"""
+
+    response = client.models.generate_content(
+        model="gemini-3.6-flash",
+        contents=prompt,
+    )
+    raw = _extract_json(response.text)
+    return json.loads(raw)
+
+
 if __name__ == "__main__":
     # Tezkor test uchun
     scenes = generate_script("Quyosh tizimi haqida qiziqarli faktlar", target_minutes=2)

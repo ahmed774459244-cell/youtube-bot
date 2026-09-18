@@ -6,7 +6,9 @@ import sqlite3
 import threading
 import time
 
-DB_PATH = "bot_database.db"
+import os
+
+DB_PATH = os.getenv("DB_PATH", "bot_database.db")
 _lock = threading.Lock()
 
 

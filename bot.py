@@ -5,8 +5,10 @@ Barcha boshqaruv tugmalar orqali, "/" buyruqlarsiz.
 Ishga tushirish: python bot.py
 """
 import asyncio
+import collections
 import logging
 import os
+import time
 
 from aiogram import Bot, Dispatcher, F
 from aiogram.filters import CommandStart
@@ -20,6 +22,8 @@ from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.client.telegram import TelegramAPIServer
 
 import db
+import premium_emoji
+from premium_emoji import apply_premium_emojis as pe
 from i18n import t, TEXTS, DEFAULT_UI_LANG, UI_LANGUAGE_BUTTONS, UI_LANG_BUTTON_TO_KEY
 from config import (
     TELEGRAM_BOT_TOKEN, USE_LOCAL_API_SERVER, LOCAL_API_SERVER_URL, MAX_CONCURRENT_JOBS,
@@ -51,6 +55,12 @@ bot = Bot(token=TELEGRAM_BOT_TOKEN, session=session, default=DefaultBotPropertie
 dp = Dispatcher()
 
 db.init_db()
+
+_configured_emojis = [k for k, v in premium_emoji.PREMIUM_EMOJI_IDS.items() if v]
+if _configured_emojis:
+    logger.info(f"Premium emoji sozlangan ({len(_configured_emojis)} ta): {_configured_emojis}")
+else:
+    logger.info("Premium emoji sozlanmagan — .env faylida PREMIUM_EMOJI_* topilmadi.")
 
 # --- VIDEO tili (skript + ovoz) — bot interfeysi tilidan MUSTAQIL ---
 LANGUAGES = {
@@ -87,6 +97,7 @@ BTN_SETS = {
     "create_video": {TEXTS[l]["btn_create_video"] for l in TEXTS},
     "balance": {TEXTS[l]["btn_balance"] for l in TEXTS},
     "buy": {TEXTS[l]["btn_buy"] for l in TEXTS},
+    "branding": {TEXTS[l]["btn_branding"] for l in TEXTS},
     "language": {TEXTS[l]["btn_language"] for l in TEXTS},
     "back": {TEXTS[l]["btn_back"] for l in TEXTS},
     "cancel": {TEXTS[l]["btn_cancel"] for l in TEXTS},
@@ -108,6 +119,27 @@ job_semaphore = asyncio.Semaphore(MAX_CONCURRENT_JOBS)
 _waiting_count = 0
 _waiting_lock = asyncio.Lock()
 
+# Navbat vaqtini taxminlash uchun — oxirgi 10 ta videoning necha soniyada tayyor bo'lganini saqlaydi
+_recent_durations = collections.deque(maxlen=10)
+_DEFAULT_DURATION_ESTIMATE_SECONDS = 240  # hali statistika yo'q bo'lsa, taxminiy boshlang'ich qiymat
+
+
+def _estimate_wait_seconds(position: int) -> int:
+    """Navbatdagi o'rinni va o'rtacha video yaratish vaqtini hisobga olib, taxminiy kutish vaqtini hisoblaydi."""
+    avg = (
+        sum(_recent_durations) / len(_recent_durations)
+        if _recent_durations else _DEFAULT_DURATION_ESTIMATE_SECONDS
+    )
+    batches_ahead = -(-position // MAX_CONCURRENT_JOBS)  # yuqoriga yaxlitlash
+    return int(batches_ahead * avg)
+
+
+def _format_duration(seconds: int) -> str:
+    minutes = seconds // 60
+    if minutes < 1:
+        return "1 daqiqadan kam"
+    return f"~{minutes} daqiqa"
+
 
 def _ui(user_id: int) -> str:
     return user_ui_language.get(user_id, DEFAULT_UI_LANG)
@@ -118,6 +150,7 @@ def main_menu_kb(ui_lang: str) -> ReplyKeyboardMarkup:
         keyboard=[
             [KeyboardButton(text=t(ui_lang, "btn_create_video"))],
             [KeyboardButton(text=t(ui_lang, "btn_balance")), KeyboardButton(text=t(ui_lang, "btn_buy"))],
+            [KeyboardButton(text=t(ui_lang, "btn_branding"))],
             [KeyboardButton(text=t(ui_lang, "btn_language"))],
         ],
         resize_keyboard=True,
@@ -186,7 +219,7 @@ async def cmd_start(message: Message):
     user_state[user_id] = "idle"
     ui_lang = _ui(user_id)
     await message.answer(
-        t(ui_lang, "welcome", free=f"{FREE_MINUTES:.0f}"),
+        pe(t(ui_lang, "welcome", free=f"{FREE_MINUTES:.0f}")),
         reply_markup=main_menu_kb(ui_lang),
     )
 
@@ -196,7 +229,7 @@ async def on_balance_button(message: Message):
     ui_lang = _ui(message.from_user.id)
     balance = db.get_or_create_user(message.from_user.id, FREE_MINUTES)
     await message.answer(
-        t(ui_lang, "balance_msg", balance=f"{balance:.1f}", buy_btn=t(ui_lang, "btn_buy")),
+        pe(t(ui_lang, "balance_msg", balance=f"{balance:.1f}", buy_btn=t(ui_lang, "btn_buy"))),
         reply_markup=main_menu_kb(ui_lang),
     )
 
@@ -219,6 +252,14 @@ async def on_interface_language_selected(message: Message):
         t(new_lang, "interface_language_selected", lang=UI_LANGUAGE_BUTTONS[new_lang]),
         reply_markup=main_menu_kb(new_lang),
     )
+
+
+@dp.message(F.text.in_(BTN_SETS["branding"]))
+async def on_branding_button(message: Message):
+    user_id = message.from_user.id
+    ui_lang = _ui(user_id)
+    user_state[user_id] = "awaiting_channel_niche"
+    await message.answer(t(ui_lang, "ask_channel_niche"), reply_markup=cancel_menu_kb(ui_lang))
 
 
 @dp.message(F.text.in_(BTN_SETS["create_video"]))
@@ -473,6 +514,54 @@ async def handle_topic(message: Message):
         )
         return
 
+    # --- "Kanal brendi" oqimi: foydalanuvchi kanal mavzusini yozadi ---
+    if user_state.get(user_id) == "awaiting_channel_niche":
+        user_state[user_id] = "idle"
+        video_lang_key = user_video_language.get(user_id, "uz")
+        script_lang = LANGUAGES[video_lang_key]["script_lang"]
+
+        status = await message.answer("⏳ ...")
+        try:
+            from script_generator import generate_channel_branding
+            from media_fetcher import generate_ai_image
+
+            main_loop = asyncio.get_event_loop()
+            branding = await main_loop.run_in_executor(None, generate_channel_branding, topic, script_lang)
+
+            names_text = "\n".join(f"{i}. {n}" for i, n in enumerate(branding.get("names", []), 1))
+            await status.edit_text(
+                f"🏷 <b>Kanal nomi variantlari:</b>\n{names_text}\n\n"
+                f"📝 <b>Tavsif:</b>\n{branding.get('description', '')}"
+            )
+
+            # Logotip (kvadrat) yaratamiz
+            logo_path = f"temp_files/logo_{user_id}.png"
+            os.makedirs("temp_files", exist_ok=True)
+            logo_ok = await main_loop.run_in_executor(
+                None, generate_ai_image, branding.get("logo_prompt", topic), logo_path
+            )
+            if logo_ok:
+                await message.answer_photo(FSInputFile(logo_path), caption="🖼 Logotip")
+                os.remove(logo_path)
+
+            # Banner (keng format) yaratamiz
+            banner_path = f"temp_files/banner_{user_id}.png"
+            banner_ok = await main_loop.run_in_executor(
+                None, generate_ai_image,
+                f"{branding.get('banner_prompt', topic)}, wide banner format, 16:9 aspect ratio",
+                banner_path,
+            )
+            if banner_ok:
+                await message.answer_photo(FSInputFile(banner_path), caption="🎨 Banner")
+                os.remove(banner_path)
+
+            await message.answer(t(ui_lang, "branding_ready"), reply_markup=main_menu_kb(ui_lang))
+        except Exception as ex:
+            logger.exception("Kanal brendi yaratishda xatolik")
+            await status.edit_text(f"❌ Xatolik: {ex}")
+            await message.answer(t(ui_lang, "back_to_menu"), reply_markup=main_menu_kb(ui_lang))
+        return
+
     if user_state.get(user_id) != "ready_for_topic":
         await message.answer(t(ui_lang, "use_buttons_prompt"), reply_markup=main_menu_kb(ui_lang))
         return
@@ -500,13 +589,14 @@ async def handle_topic(message: Message):
         _waiting_count += 1
 
     if position > 0:
+        wait_seconds = _estimate_wait_seconds(position)
         status_msg = await message.answer(
-            t(ui_lang, "queue_msg", position=position),
+            pe(t(ui_lang, "queue_msg", position=position, wait_time=_format_duration(wait_seconds))),
             reply_markup=main_menu_kb(ui_lang),
         )
     else:
         status_msg = await message.answer(
-            t(ui_lang, "preparing_msg", topic=topic, minutes=minutes, lang=lang_settings["label"]),
+            pe(t(ui_lang, "preparing_msg", topic=topic, minutes=minutes, lang=lang_settings["label"])),
             reply_markup=main_menu_kb(ui_lang),
         )
 
@@ -519,9 +609,28 @@ async def handle_topic(message: Message):
                 t(ui_lang, "preparing_msg", topic=topic, minutes=minutes, lang=lang_settings["label"])
             )
 
+        if ADMIN_TELEGRAM_ID:
+            try:
+                await bot.send_message(
+                    ADMIN_TELEGRAM_ID,
+                    f"🎬 Boshlandi: user {user_id} — \"{topic}\" ({minutes} min, {lang_settings['label']}, "
+                    f"{'Multfilm' if use_ai_images else 'Stock'})",
+                )
+            except Exception:
+                pass
+
+        _job_start_time = time.time()
         success = await _generate_and_send(message, status_msg, topic, minutes, lang_settings, ui_lang, use_ai_images)
+        _recent_durations.append(time.time() - _job_start_time)
         if not success:
             db.add_balance(user_id, minutes)
+
+        if ADMIN_TELEGRAM_ID:
+            try:
+                result_text = "✅ Tayyor" if success else "❌ Xatolik (balans qaytarildi)"
+                await bot.send_message(ADMIN_TELEGRAM_ID, f"{result_text}: user {user_id} — \"{topic}\"")
+            except Exception:
+                pass
 
 
 async def _generate_and_send(message: Message, status_msg: Message, topic: str, minutes: int,
@@ -537,6 +646,15 @@ async def _generate_and_send(message: Message, status_msg: Message, topic: str, 
                 pass
         asyncio.run_coroutine_threadsafe(_edit(), main_loop)
 
+        # Sahna tugagan har safar (spam bo'lmasligi uchun faqat shu belgi bilan) admin'ga ham xabar beramiz.
+        if ADMIN_TELEGRAM_ID and "klip yig'ilmoqda" in text:
+            async def _notify_admin():
+                try:
+                    await bot.send_message(ADMIN_TELEGRAM_ID, f"   {text}")
+                except Exception:
+                    pass
+            asyncio.run_coroutine_threadsafe(_notify_admin(), main_loop)
+
     try:
         from pipeline import create_video
         video_path = await main_loop.run_in_executor(
@@ -544,29 +662,53 @@ async def _generate_and_send(message: Message, status_msg: Message, topic: str, 
             use_ai_images,
         )
 
-        await status_msg.edit_text(t(ui_lang, "sending_msg"))
+        try:
+            await status_msg.edit_text(pe(t(ui_lang, "sending_msg")))
+        except Exception:
+            pass  # bu — shunchaki oraliq status xabari, muvaffaqiyatsiz bo'lsa ham video yuborishda davom etamiz
         video_file = FSInputFile(video_path)
 
         last_error = None
         for attempt in range(1, 4):
             try:
-                await message.answer_video(video_file, caption=t(ui_lang, "video_ready_caption", topic=topic))
+                await message.answer_video(video_file, caption=pe(t(ui_lang, "video_ready_caption", topic=topic)))
                 last_error = None
                 break
             except Exception as send_err:
                 last_error = send_err
                 logger.warning(f"Video yuborish urinish {attempt}/3 muvaffaqiyatsiz: {send_err}")
-                await status_msg.edit_text(t(ui_lang, "resend_retry_msg", attempt=attempt))
+                try:
+                    await status_msg.edit_text(t(ui_lang, "resend_retry_msg", attempt=attempt))
+                except Exception:
+                    pass
 
         if last_error:
             raise last_error
 
         os.remove(video_path)
+
+        # Video muvaffaqiyatli yuborilgach, YouTube uchun sarlavha/tavsif/hashtag'lar ham yaratib beramiz
+        try:
+            from script_generator import generate_youtube_metadata
+            meta = await main_loop.run_in_executor(
+                None, generate_youtube_metadata, topic, lang_settings["script_lang"]
+            )
+            titles_text = "\n".join(f"{i}. {t_}" for i, t_ in enumerate(meta.get("titles", []), 1))
+            hashtags_text = " ".join(f"#{h}" for h in meta.get("hashtags", []))
+            meta_message = (
+                f"📌 <b>Sarlavha variantlari:</b>\n{titles_text}\n\n"
+                f"📝 <b>Tavsif:</b>\n{meta.get('description', '')}\n\n"
+                f"🏷 <b>Hashtag'lar:</b>\n{hashtags_text}"
+            )
+            await message.answer(meta_message)
+        except Exception:
+            logger.warning("YouTube metadata yaratib bo'lmadi (video baribir yuborildi).")
+
         return True
 
     except Exception as e:
         logger.exception("Video yaratishda xatolik")
-        error_text = t(ui_lang, "error_msg", error=str(e))
+        error_text = pe(t(ui_lang, "error_msg", error=str(e)))
         try:
             await status_msg.edit_text(error_text)
         except Exception:
