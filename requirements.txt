@@ -1,5 +1,5 @@
 aiogram==3.13.1
-google-genai==0.7.0
+google-genai>=2.18.1
 edge-tts==6.1.19
 gTTS==2.5.3
 requests==2.32.3
