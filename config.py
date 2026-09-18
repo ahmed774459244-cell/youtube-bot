@@ -9,15 +9,15 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Telegram bot ---
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "").strip()
 
 # --- Skript yozish uchun (Gemini API) ---
 # Google AI Studio (aistudio.google.com) dan bepul olinadi
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "").strip()
 
 # --- Fon rasm/video uchun (Pexels — bepul, cheksiz) ---
 # https://www.pexels.com/api/ dan bepul ro'yxatdan o'tib olinadi
-PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
+PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "").strip()
 
 # --- Video sozlamalari ---
 VIDEO_WIDTH = int(os.getenv("VIDEO_WIDTH", "1280"))

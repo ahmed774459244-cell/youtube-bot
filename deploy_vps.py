@@ -75,6 +75,10 @@ def main():
         client.close()
         sys.exit(1)
 
+    # Windows'da tahrirlangan .env faylida "\r" (carriage return) belgilari qolib ketishi mumkin,
+    # bu esa kalitlarning oxiriga yopishib, ularni buzib qo'yadi. Shuni tozalaymiz.
+    run_command(client, "sed -i 's/\\r$//' ~/youtube-bot/.env", ".env faylidagi Windows qator belgilarini tozalash")
+
     # 4. Docker image qurish
     run_command(client, "cd ~/youtube-bot && sudo docker build -t youtube-bot .", "Docker image qurilmoqda (bir necha daqiqa davom etishi mumkin)")
 
