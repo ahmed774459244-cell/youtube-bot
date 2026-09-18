@@ -1,4 +1,4 @@
-aiogram==3.13.1
+aiogram>=3.31.0
 google-genai>=2.18.1
 edge-tts==6.1.19
 gTTS==2.5.3
